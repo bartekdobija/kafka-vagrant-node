@@ -34,9 +34,11 @@ $sysconfig = <<SCRIPT
 SCRIPT
 
 $javajdk = <<SCRIPT
+  wget -q --no-cookies --no-check-certificate --header "Cookie: gpw_e24=http%3A%2F%2Fwww.oracle.com%2F; oraclelicense=accept-securebackup-cookie" "http://download.oracle.com/otn-pub/java/jdk/7u79-b15/jdk-7u79-linux-x64.rpm" \
+    && yum -y remove java-1.6* \
+    && rpm -i jdk-7u79-linux-x64.rpm
 
-  yum install -y java-1.8.0-openjdk java-1.8.0-openjdk-devel
-
+  echo "export JAVA_HOME=/usr/java/default" > /etc/profile.d/java.sh
 SCRIPT
 
 # Zookeeper installation & configuration
@@ -45,9 +47,9 @@ $zookeeper = <<SCRIPT
   ZOOKPR_LINK=/opt/zookeeper
   if [ ! -e ${ZOOKPR_LINK} ]; then
     echo "Zookeeper installation..."
-    ZOOKPR_VER=zookeeper-3.4.6
+    ZOOKPR_VER=zookeeper-3.4.8
     ZOOKPR_DAT=/opt/zookeeper-data
-    wget http://mirrors.whoishostingthis.com/apache/zookeeper/zookeeper-3.4.6/${ZOOKPR_VER}.tar.gz -q -P /tmp/ \
+    wget http://mirrors.whoishostingthis.com/apache/zookeeper/${ZOOKPR_VER}/${ZOOKPR_VER}.tar.gz -q -P /tmp/ \
       && tar zxf /tmp/${ZOOKPR_VER}.tar.gz -C /opt/ \
       && ln -f -s /opt/${ZOOKPR_VER} ${ZOOKPR_LINK} \
       && echo "export ZOO_LOG_DIR=/opt/zookeeper/logs" > /etc/profile.d/zookeeper.sh \
@@ -112,13 +114,13 @@ $kafka = <<SCRIPT
   KAFKA_LINK=/opt/kafka
   if [ ! -e ${KAFKA_LINK} ]; then
     echo "Kafka installation..."
-    KAFKA_VER=kafka_2.11-0.8.2.2
-    wget http://mirrors.whoishostingthis.com/apache/kafka/0.8.2.2/${KAFKA_VER}.tgz -q -P /tmp/ \
-      && tar zxf /tmp/${KAFKA_VER}.tgz -C /opt/ \
-      && ln -f -s /opt/${KAFKA_VER} ${KAFKA_LINK} \
+    KAFKA_VER=0.9.0.1
+    wget http://ftp.heanet.ie/mirrors/www.apache.org/dist/kafka/${KAFKA_VER}/kafka_2.11-${KAFKA_VER}.tgz -q -P /tmp/ \
+      && tar zxf /tmp/kafka_2.11-${KAFKA_VER}.tgz -C /opt/ \
+      && ln -f -s /opt/kafka_2.11-${KAFKA_VER} ${KAFKA_LINK} \
       && echo "PATH=\\${PATH}:${KAFKA_LINK}/bin" > /etc/profile.d/kafka.sh \
       && mkdir -p ${KAFKA_LINK}/logs \
-      && chown -R kafka:kafka /opt/${KAFKA_VER}
+      && chown -R kafka:kafka /opt/kafka_2.11-${KAFKA_VER}
   fi
 
   cat << KFINITD > /etc/init.d/kafka
