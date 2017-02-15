@@ -3,7 +3,10 @@
 $sysconfig = <<SCRIPT
 
   # disable IPv6
-  echo "net.ipv6.conf.all.disable_ipv6=1" > /etc/sysctl.conf && sysctl -f /etc/sysctl.conf
+  echo "net.ipv6.conf.all.disable_ipv6=1" > /etc/sysctl.conf 
+  echo "net.ipv6.conf.default.disable_ipv6 = 1" >> /etc/sysctl.conf
+  sysctl -f /etc/sysctl.conf
+
 
   # this should be a persistent config
   ulimit -n 65536
@@ -47,7 +50,7 @@ $zookeeper = <<SCRIPT
   ZOOKPR_LINK=/opt/zookeeper
   if [ ! -e ${ZOOKPR_LINK} ]; then
     echo "Zookeeper installation..."
-    ZOOKPR_VER=zookeeper-3.4.8
+    ZOOKPR_VER=zookeeper-3.4.9
     ZOOKPR_DAT=/opt/zookeeper-data
     wget http://mirrors.whoishostingthis.com/apache/zookeeper/${ZOOKPR_VER}/${ZOOKPR_VER}.tar.gz -q -P /tmp/ \
       && tar zxf /tmp/${ZOOKPR_VER}.tar.gz -C /opt/ \
@@ -114,7 +117,7 @@ $kafka = <<SCRIPT
   KAFKA_LINK=/opt/kafka
   if [ ! -e ${KAFKA_LINK} ]; then
     echo "Kafka installation..."
-    KAFKA_VER=0.9.0.1
+    KAFKA_VER=0.10.1.1
     wget http://ftp.heanet.ie/mirrors/www.apache.org/dist/kafka/${KAFKA_VER}/kafka_2.11-${KAFKA_VER}.tgz -q -P /tmp/ \
       && tar zxf /tmp/kafka_2.11-${KAFKA_VER}.tgz -C /opt/ \
       && ln -f -s /opt/kafka_2.11-${KAFKA_VER} ${KAFKA_LINK} \
@@ -201,8 +204,8 @@ $information = <<SCRIPT
     echo "Test commands:"
     echo "kafka-topics.sh --zookeeper localhost:2181 --list"
     echo "kafka-topics.sh --zookeeper localhost:2181 --create --topic <topic_name> --partitions 1 --replication-factor 1"
-    echo "kafka-console-consumer.sh --zookeeper localhost:2181 --blacklist none"
-    echo "kafka-console-producer.sh --broker-list $ip:9092 --topic flightinfo"
+    echo "kafka-console-consumer.sh --bootstrap-server localhost:9092 --blacklist none"
+    echo "kafka-console-producer.sh --broker-list $ip:9092 --topic transactions"
     echo "> test event"
     echo " "
 SCRIPT
