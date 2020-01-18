@@ -1,48 +1,50 @@
 
 # Basic OS configuration
 $sysconfig = <<SCRIPT
-
   # disable IPv6
-  echo "net.ipv6.conf.all.disable_ipv6=1" > /etc/sysctl.conf 
-  echo "net.ipv6.conf.default.disable_ipv6 = 1" >> /etc/sysctl.conf
-  sysctl -f /etc/sysctl.conf
+  if [ "$(grep disable_ipv6 /etc/sysctl.conf | wc -l)" == "0" ]; then
+    echo "net.ipv6.conf.all.disable_ipv6=1" >> /etc/sysctl.conf \
+      && echo "net.ipv6.conf.default.disable_ipv6=1" >> /etc/sysctl.conf \
+      && sysctl -f /etc/sysctl.conf \
+      && sysctl -p
 
+    sysctl -w net.ipv6.conf.all.disable_ipv6=1
+    sysctl -w net.ipv6.conf.default.disable_ipv6=1
+
+  fi
 
   # this should be a persistent config
   ulimit -n 65536
   ulimit -s 10240
   ulimit -c unlimited
 
-  service iptables stop && chkconfig iptables off
-
+  systemctl disable firewalld && systemctl stop firewalld
+  
   # Add entries to /etc/hosts
-  ip=$(ifconfig eth1 | awk -v host=$(hostname) '/inet addr/ {print substr($2,6)}')
+  ip=$(ip a s eth1 | awk '/inet/ {split($2, a,"/"); print a[1] }')
   host=$(hostname)
   echo "127.0.0.1 localhost" > /etc/hosts
   echo "$ip $host" >> /etc/hosts
-
-  PASSWORD=$(echo "$(date)$RANDOM" | md5sum | awk '{print $1}')
-  KAFKA_USER=kafka
-  if ! grep ${KAFKA_USER} /etc/passwd; then
-    echo "Creating user ${KAFKA_USER}" \
-        && useradd -p $(openssl passwd -1 ${PASSWORD}) ${KAFKA_USER}
+  if [ "$(grep vm.swappiness /etc/sysctl.conf | wc -l)" == "0" ]; then
+    echo "vm.swappiness=0" >> /etc/sysctl.conf && sysctl vm.swappiness=0
   fi
 
-  ZOOKPR_USER=zookeeper
-  if ! grep ${ZOOKPR_USER} /etc/passwd; then
-    echo "Creating user ${ZOOKPR_USER}" \
-        && useradd -p $(openssl passwd -1 ${PASSWORD}) ${ZOOKPR_USER}
-  fi
+  # disable selinux 
+  sudo setenforce 0
+  sed -i 's/SELINUX=enforcing/SELINUX=disabled/g' /etc/selinux/config
+
+  # disable swap 
+  swapoff -a
 
 SCRIPT
 
-$javajdk = <<SCRIPT
-  wget -q --no-cookies --no-check-certificate --header "Cookie: gpw_e24=http%3A%2F%2Fwww.oracle.com%2F; oraclelicense=accept-securebackup-cookie" "http://download.oracle.com/otn-pub/java/jdk/7u79-b15/jdk-7u79-linux-x64.rpm" \
-    && yum -y remove java-1.6* \
-    && rpm -i jdk-7u79-linux-x64.rpm
-
-  echo "export JAVA_HOME=/usr/java/default" > /etc/profile.d/java.sh
+# DNF configuration
+$dnf_config = <<SCRIPT
+  rpm -i https://dl.fedoraproject.org/pub/epel/epel-release-latest-8.noarch.rpm 2> /dev/null
+  dnf -y remove java-1.6* > /dev/null
+  dnf -y install wget curl curl-devel libxml2 libxml2-devel openssl openssl-devel java-latest-openjdk
 SCRIPT
+
 
 # Zookeeper installation & configuration
 $zookeeper = <<SCRIPT
@@ -50,17 +52,18 @@ $zookeeper = <<SCRIPT
   ZOOKPR_LINK=/opt/zookeeper
   if [ ! -e ${ZOOKPR_LINK} ]; then
     echo "Zookeeper installation..."
-    ZOOKPR_VER=zookeeper-3.4.9
+    ZOOKPR_VER=zookeeper-3.5.6
     ZOOKPR_DAT=/opt/zookeeper-data
-    wget http://mirrors.whoishostingthis.com/apache/zookeeper/${ZOOKPR_VER}/${ZOOKPR_VER}.tar.gz -q -P /tmp/ \
-      && tar zxf /tmp/${ZOOKPR_VER}.tar.gz -C /opt/ \
-      && ln -f -s /opt/${ZOOKPR_VER} ${ZOOKPR_LINK} \
+    adduser zookeeper
+    wget http://mirrors.whoishostingthis.com/apache/zookeeper/${ZOOKPR_VER}/apache-${ZOOKPR_VER}-bin.tar.gz -q -P /tmp/ \
+      && tar zxf /tmp/apache-${ZOOKPR_VER}-bin.tar.gz -C /opt/ \
+      && ln -f -s /opt/apache-${ZOOKPR_VER}-bin ${ZOOKPR_LINK} \
       && echo "export ZOO_LOG_DIR=/opt/zookeeper/logs" > /etc/profile.d/zookeeper.sh \
       && echo "export PATH=\\${PATH}:${ZOOKPR_LINK}/bin" >> /etc/profile.d/zookeeper.sh \
       && mkdir -p ${ZOOKPR_DAT} \
       && mkdir -p ${ZOOKPR_LINK}/logs \
       && chown -R zookeeper:zookeeper ${ZOOKPR_DAT} \
-      && chown -R zookeeper:zookeeper /opt/${ZOOKPR_VER} \
+      && chown -R zookeeper:zookeeper /opt/apache-${ZOOKPR_VER}-bin \
       && echo "dataDir=${ZOOKPR_DAT}" > ${ZOOKPR_LINK}/conf/zoo.cfg \
       && echo "maxClientCnxns=0" >> ${ZOOKPR_LINK}/conf/zoo.cfg \
       && echo "clientPort=2181" >> ${ZOOKPR_LINK}/conf/zoo.cfg
@@ -117,13 +120,14 @@ $kafka = <<SCRIPT
   KAFKA_LINK=/opt/kafka
   if [ ! -e ${KAFKA_LINK} ]; then
     echo "Kafka installation..."
-    KAFKA_VER=0.10.1.1
-    wget http://ftp.heanet.ie/mirrors/www.apache.org/dist/kafka/${KAFKA_VER}/kafka_2.11-${KAFKA_VER}.tgz -q -P /tmp/ \
-      && tar zxf /tmp/kafka_2.11-${KAFKA_VER}.tgz -C /opt/ \
-      && ln -f -s /opt/kafka_2.11-${KAFKA_VER} ${KAFKA_LINK} \
+    KAFKA_VER=2.4.0
+    adduser kafka
+    wget http://ftp.heanet.ie/mirrors/www.apache.org/dist/kafka/${KAFKA_VER}/kafka_2.12-${KAFKA_VER}.tgz -q -P /tmp/ \
+      && tar zxf /tmp/kafka_2.12-${KAFKA_VER}.tgz -C /opt/ \
+      && ln -f -s /opt/kafka_2.12-${KAFKA_VER} ${KAFKA_LINK} \
       && echo "PATH=\\${PATH}:${KAFKA_LINK}/bin" > /etc/profile.d/kafka.sh \
       && mkdir -p ${KAFKA_LINK}/logs \
-      && chown -R kafka:kafka /opt/kafka_2.11-${KAFKA_VER}
+      && chown -R kafka:kafka /opt/kafka_2.12-${KAFKA_VER}
   fi
 
   cat << KFINITD > /etc/init.d/kafka
@@ -183,7 +187,7 @@ SCRIPT
 
 # Info
 $information = <<SCRIPT
-    ip=$(ifconfig eth1 | awk -v host=$(hostname) '/inet addr/ {print substr($2,6)}')
+    ip=$(ip a s eth1 | awk '/inet/ {split($2, a,"/"); print a[1]}')
     echo ""
     echo "VM's IP address: $ip"
     echo ""
@@ -212,7 +216,7 @@ SCRIPT
 
 Vagrant.configure(2) do |config|
 
-  config.vm.box = "boxcutter/centos66"
+  config.vm.box = "centos/8"
   config.vm.hostname = "kafka.instance.com"
   config.vm.network :public_network, :mac => "0800DEADBEEF"
 
@@ -225,7 +229,7 @@ Vagrant.configure(2) do |config|
   end
 
   config.vm.provision :shell, :name => "sysconfig", :inline => $sysconfig
-  config.vm.provision :shell, :name => "javajdk", :inline => $javajdk
+  config.vm.provision :shell, :name => "dnf_config", :inline => $dnf_config
   config.vm.provision :shell, :name => "zookeeper", :inline => $zookeeper
   config.vm.provision :shell, :name => "kafka", :inline => $kafka
   config.vm.provision :shell, :name => "information", :inline => $information
