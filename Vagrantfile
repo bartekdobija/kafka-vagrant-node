@@ -118,16 +118,20 @@ SCRIPT
 $kafka = <<SCRIPT
 
   KAFKA_LINK=/opt/kafka
+  KAFKA_HOST=$(ip a s eth1 | awk '/inet/ {split($2, a,"/"); print a[1]}')
+
   if [ ! -e ${KAFKA_LINK} ]; then
     echo "Kafka installation..."
     KAFKA_VER=2.4.0
     adduser kafka
-    wget http://ftp.heanet.ie/mirrors/www.apache.org/dist/kafka/${KAFKA_VER}/kafka_2.12-${KAFKA_VER}.tgz -q -P /tmp/ \
+    wget https://www-eu.apache.org/dist/kafka/${KAFKA_VER}/kafka_2.12-${KAFKA_VER}.tgz -q -P /tmp/ \
       && tar zxf /tmp/kafka_2.12-${KAFKA_VER}.tgz -C /opt/ \
       && ln -f -s /opt/kafka_2.12-${KAFKA_VER} ${KAFKA_LINK} \
       && echo "PATH=\\${PATH}:${KAFKA_LINK}/bin" > /etc/profile.d/kafka.sh \
       && mkdir -p ${KAFKA_LINK}/logs \
-      && chown -R kafka:kafka /opt/kafka_2.12-${KAFKA_VER}
+      && chown -R kafka:kafka /opt/kafka_2.12-${KAFKA_VER} \
+      && echo "advertised.host.name=${KAFKA_HOST}" >> ${KAFKA_LINK}/config/server.properties \
+      && sed -i "s/localhost/${KAFKA_HOST}/g" ${KAFKA_LINK}/config/producer.properties
   fi
 
   cat << KFINITD > /etc/init.d/kafka
@@ -174,14 +178,8 @@ KFINITD
   fi
 
   # create sample topics
-  for topic in clickstream transactions; do
-    ${KAFKA_LINK}/bin/kafka-topics.sh \
-      --create \
-      --zookeeper localhost:2181 \
-      --topic ${topic} \
-      --partitions 1 \
-      --replication-factor 1 &> /dev/null
-  done
+  ${KAFKA_LINK}/bin/kafka-topics.sh --create --zookeeper localhost:2181 --topic clickstream --partitions 1 --replication-factor 1 &> /dev/null
+  ${KAFKA_LINK}/bin/kafka-topics.sh --create --zookeeper localhost:2181 --topic transactions --partitions 1 --replication-factor 1 &> /dev/null
 
 SCRIPT
 
@@ -208,8 +206,8 @@ $information = <<SCRIPT
     echo "Test commands:"
     echo "kafka-topics.sh --zookeeper localhost:2181 --list"
     echo "kafka-topics.sh --zookeeper localhost:2181 --create --topic <topic_name> --partitions 1 --replication-factor 1"
-    echo "kafka-console-consumer.sh --bootstrap-server localhost:9092 --blacklist none"
-    echo "kafka-console-producer.sh --broker-list $ip:9092 --topic transactions"
+    echo "kafka-console-consumer.sh --bootstrap-server localhost:9092 --topic clickstream"
+    echo "kafka-console-producer.sh --broker-list $ip:9092 --topic clickstream"
     echo "> test event"
     echo " "
 SCRIPT
