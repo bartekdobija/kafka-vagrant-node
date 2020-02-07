@@ -217,7 +217,7 @@ Vagrant.configure(2) do |config|
 
   config.vm.box = "centos/8"
   config.vm.hostname = "kafka.instance.com"
-  config.vm.network :public_network, :mac => "0800DEADBEEF"
+  config.vm.network :public_network
 
   config.vm.provider "virtualbox" do |vb|
     vb.name = "kafka-node"
