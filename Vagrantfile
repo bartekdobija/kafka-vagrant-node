@@ -66,7 +66,8 @@ $zookeeper = <<SCRIPT
       && chown -R zookeeper:zookeeper /opt/apache-${ZOOKPR_VER}-bin \
       && echo "dataDir=${ZOOKPR_DAT}" > ${ZOOKPR_LINK}/conf/zoo.cfg \
       && echo "maxClientCnxns=0" >> ${ZOOKPR_LINK}/conf/zoo.cfg \
-      && echo "clientPort=2181" >> ${ZOOKPR_LINK}/conf/zoo.cfg
+      && echo "clientPort=2181" >> ${ZOOKPR_LINK}/conf/zoo.cfg \
+      && echo "clientPortAddress=0.0.0.0" >> ${ZOOKPR_LINK}/conf/zoo.cfg
   fi
 
   cat << ZOOINITD > /etc/init.d/zookeeper
