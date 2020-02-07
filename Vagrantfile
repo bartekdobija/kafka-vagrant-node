@@ -146,7 +146,7 @@ USER=kafka
 KAFKA_JMX_PORT=9666
 
 function start {
-  sudo -E -u \\${USER} JMX_PORT=\\${KAFKA_JMX_PORT} \\${KAFKA_HOME}/bin/kafka-server-start.sh -daemon \\${KAFKA_CONFIG}
+  sudo -E -u \\${USER} JMX_PORT=\\${KAFKA_JMX_PORT} LOG_DIR=/tmp/kafka/log \\${KAFKA_HOME}/bin/kafka-server-start.sh -daemon \\${KAFKA_CONFIG}
 }
 
 function stop {
