@@ -52,7 +52,7 @@ $zookeeper = <<SCRIPT
   ZOOKPR_LINK=/opt/zookeeper
   if [ ! -e ${ZOOKPR_LINK} ]; then
     echo "Zookeeper installation..."
-    ZOOKPR_VER=zookeeper-3.5.6
+    ZOOKPR_VER=zookeeper-3.5.7
     ZOOKPR_DAT=/opt/zookeeper-data
     adduser zookeeper
     wget http://mirrors.whoishostingthis.com/apache/zookeeper/${ZOOKPR_VER}/apache-${ZOOKPR_VER}-bin.tar.gz -q -P /tmp/ \
